@@ -1,0 +1,13 @@
+{
+  "zookeep-project-guid": "d1ee91ed-e7d6-4a5c-b08e-83489e556a01",
+  "name": "eco",
+  "repo-type": "python-2026-03",
+  "license": "CC0-1.0",
+  "repository": {
+    "name": "eco",
+    "visibility": "public"
+  },
+  "python-package": {
+    "name": "lions_eco"
+  }
+}

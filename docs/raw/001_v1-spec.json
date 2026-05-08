@@ -1,0 +1,252 @@
+{
+  "document": {
+    "document-id": "eco.spec.v1",
+    "title": "eco Specification v1",
+    "tags": [
+      "eco",
+      "runtime",
+      "execution",
+      "filesystem",
+      "runner",
+      "python",
+      "lionscliapp"
+    ],
+    "purpose": "Describe eco: a filesystem-native execution runner that crystallizes executable directory trees into timestamped run directories and executes them there.",
+    "author": [
+      "Lion Kimbro",
+      "Wing-Cat (Chat-GPT)"
+    ],
+    "status": "draft",
+    "type": "specification",
+    "developed-in": "https://chatgpt.com/c/69fe3ee8-4834-83e8-bcab-cd22ea96cfd7"
+  },
+  "introduction": {
+    "overview": [
+      "eco is a generic execution runner.",
+      "eco does not know about mills, workflows, pipelines, graphs, or AI systems.",
+      "eco only knows how to:",
+      "  - load an ecology definition",
+      "  - allocate a timestamped run directory",
+      "  - deep-copy the ecology into that run directory",
+      "  - execute the ecology from within that copied directory",
+      "  - record execution metadata"
+    ],
+    "design-goals": [
+      "Filesystem-native execution.",
+      "Executable environments should be inspectable after execution.",
+      "Runs should be reproducible.",
+      "Execution should occur entirely inside the copied run directory.",
+      "The source ecology should never be mutated during execution.",
+      "The system should remain small, understandable, and hackable."
+    ],
+    "relationship-to-lionscliapp": [
+      "eco is implemented as a lionscliapp application.",
+      "eco uses lionscliapp persistent configuration storage.",
+      "eco uses lionscliapp command dispatch.",
+      "eco uses lionscliapp path handling.",
+      "eco stores persistent configuration in a .eco directory."
+    ]
+  },
+  "command-line-interface": {
+    "description": "The eco command-line interface.",
+    "examples": [
+      "eco --ecology F:/mills/fantasy-scene/src --rundir F:/mill-runs run",
+      "eco set rundir F:/mill-runs",
+      "eco --ecology F:/mills/fantasy-scene/src run"
+    ]
+  },
+  "persistent-configuration": {
+    "description": "Persistent configuration handled through lionscliapp."
+  },
+  "ecology-directory": {
+    "description": "A source directory tree that eco can crystallize into a runnable execution directory.",
+    "notes": [
+      "eco treats the ecology as opaque.",
+      "eco does not interpret the contents beyond ecology.json.",
+      "The ecology may contain Python programs, shell scripts, assets, configuration files, or arbitrary data."
+    ],
+    "required-files": [
+      "ecology.json"
+    ]
+  },
+  "ecology-json": {
+    "title": "ecology.json",
+    "description": "Defines how eco executes an ecology.",
+    "structure": {
+      "type": "object",
+      "keys": {
+        "eco-version": {
+          "type": "string",
+          "required": true,
+          "constraints": {
+            "allowed_values": [
+              "1.0"
+            ]
+          }
+        },
+        "identity": {
+          "type": "object",
+          "required": false,
+          "keys": {
+            "name": {
+              "type": "string",
+              "required": false
+            },
+            "type": {
+              "type": "string",
+              "required": false
+            },
+            "description": {
+              "type": "string",
+              "required": false
+            }
+          }
+        },
+        "execution": {
+          "type": "object",
+          "required": true,
+          "keys": {
+            "entry-type": {
+              "type": "string",
+              "required": true,
+              "description": "Execution mechanism used by eco.",
+              "vocabulary": {
+                "subprocess": "Execute using subprocess.run()."
+              },
+              "vocabulary_mode": "closed"
+            },
+            "cwd": {
+              "type": "string",
+              "required": true,
+              "description": "Working directory relative to the copied run directory.",
+              "examples": [
+                ".",
+                "runtime"
+              ]
+            },
+            "command": {
+              "type": "array",
+              "required": true,
+              "description": "Command list supplied directly to subprocess.run().",
+              "items": {
+                "type": "string"
+              },
+              "examples": [
+                [
+                  "python",
+                  "-m",
+                  "runtime.run"
+                ]
+              ]
+            },
+            "environment": {
+              "type": "object",
+              "required": false,
+              "description": "Environment variables supplied to subprocess.run().",
+              "additional_keys": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "run-directory-allocation": {
+    "description": [
+      "Run directories are allocated under the configured rundir.",
+      "Directory names follow the format yyyy-mm-dd_run-####.",
+      "Run numbering resets each new day.",
+      "The first run number of a day is run-0000."
+    ]
+  },
+  "execution-process": {
+    "description": "Execution lifecycle for eco run.",
+    "steps": [
+      "Load ecology.json from the source ecology directory.",
+      "Validate required fields.",
+      "Allocate a timestamped run directory under the configured rundir.",
+      "Deep-copy the entire source ecology directory into the allocated run directory.",
+      "Write ECO-RUN.json with status RUNNING.",
+      "Execute the declared command using subprocess.run().",
+      "Rewrite ECO-RUN.json with final status COMPLETE or FAILED."
+    ]
+  },
+  "eco-run-json": {
+    "title": "ECO-RUN.json",
+    "description": "Execution metadata written into the run directory by eco.",
+    "structure": {
+      "type": "object",
+      "keys": {
+        "eco-run-version": {
+          "type": "string",
+          "required": true,
+          "constraints": {
+            "allowed_values": [
+              "1.0"
+            ]
+          }
+        },
+        "run-id": {
+          "type": "string",
+          "required": true,
+          "examples": [
+            "2026-05-08_run-0000"
+          ]
+        },
+        "created-at": {
+          "type": "string",
+          "required": true,
+          "semantic_type": "timestamp - seconds since the epoch",
+          "logical_type": "string"
+        },
+        "source-ecology": {
+          "type": "string",
+          "required": true,
+          "semantic_type": "filesystem-path"
+        },
+        "status": {
+          "type": "string",
+          "required": true,
+          "vocabulary": {
+            "RUNNING": "Execution is currently in progress.",
+            "COMPLETE": "Execution completed successfully.",
+            "FAILED": "Execution failed."
+          }
+        },
+        "execution": {
+          "type": "object",
+          "required": true,
+          "keys": {
+            "entry-type": {
+              "type": "string",
+              "required": true
+            },
+            "cwd": {
+              "type": "string",
+              "required": true
+            },
+            "command": {
+              "type": "array",
+              "required": true,
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "implementation-notes": {
+    "notes": [
+      "eco v1 intentionally avoids orchestration complexity.",
+      "eco v1 does not define workflow semantics.",
+      "eco v1 does not define graph execution.",
+      "eco v1 does not define distributed execution.",
+      "eco v1 focuses only on reproducible execution crystallization.",
+      "The copied run directory is the execution environment.",
+      "Execution always occurs inside the copied run directory, never inside the source ecology."
+    ]
+  }
+}
