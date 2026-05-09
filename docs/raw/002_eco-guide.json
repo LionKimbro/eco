@@ -1,0 +1,498 @@
+{
+  "document": {
+    "document-id": "eco.guide.v1",
+    "title": "eco Guide for LLMs",
+    "tags": [
+      "eco",
+      "guide",
+      "llm",
+      "runtime",
+      "execution",
+      "filesystem",
+      "python",
+      "lionscliapp"
+    ],
+    "purpose": "Guide LLM instances in understanding eco, running ecologies, authoring ecology directories, configuring ecology.json, and keeping the system operational.",
+    "audience": [
+      "LLM coding agents",
+      "Wing-Cat instances",
+      "human programmers collaborating with LLMs"
+    ],
+    "status": "draft",
+    "type": {
+      "logical": {
+        "base": "file",
+        "format": "json",
+        "encoding": "utf-8"
+      },
+      "semantic": {
+        "base": "guide"
+      }
+    }
+  },
+  "orientation": {
+    "short-version": "eco copies an executable directory tree into a timestamped run directory, runs the copied version, and records what happened.",
+    "mental-model": [
+      "An ecology is a source directory that knows how to run itself.",
+      "The source ecology is a template.",
+      "The run directory is the working copy.",
+      "eco executes only inside the copied run directory.",
+      "The source ecology should not be mutated by execution.",
+      "Each run leaves behind inspectable filesystem evidence."
+    ],
+    "why-it-exists": [
+      "To make program runs reproducible and inspectable.",
+      "To keep source directories clean while still allowing programs to write outputs.",
+      "To preserve the exact executable directory tree used for a run.",
+      "To provide a tiny substrate that richer tools can build on without making eco itself into a workflow engine."
+    ]
+  },
+  "core-vocabulary": {
+    "ecology": {
+      "definition": "A source directory tree containing ecology.json and any files needed by the program being run.",
+      "notes": [
+        "The ecology may contain Python modules, scripts, assets, prompts, JSON files, shell scripts, data files, or arbitrary other files.",
+        "eco treats the ecology as opaque except for ecology.json.",
+        "The ecology should be authored so that it can run from a copied directory."
+      ]
+    },
+    "ecology-json": {
+      "filename": "ecology.json",
+      "definition": "The control file inside an ecology that tells eco how to execute the copied ecology.",
+      "required": true
+    },
+    "run-directory": {
+      "definition": "A timestamped directory created under execpath.rundir that contains a copy of the ecology and execution metadata.",
+      "name-format": "yyyy-mm-dd_run-####",
+      "examples": [
+        "2026-05-08_run-0000",
+        "2026-05-08_run-0001"
+      ]
+    },
+    "eco-run-json": {
+      "filename": "ECO-RUN.json",
+      "definition": "Metadata written by eco into the run directory before and after execution.",
+      "statuses": [
+        "RUNNING",
+        "COMPLETE",
+        "FAILED"
+      ]
+    }
+  },
+  "what-eco-does": [
+    "Reads configuration from lionscliapp.",
+    "Loads ecology.json from the source ecology directory.",
+    "Validates the small set of fields eco understands.",
+    "Allocates a fresh run directory under execpath.rundir.",
+    "Deep-copies the entire ecology directory into the run directory.",
+    "Writes ECO-RUN.json with status RUNNING.",
+    "Runs the declared subprocess from inside the copied directory.",
+    "Rewrites ECO-RUN.json with status COMPLETE or FAILED."
+  ],
+  "what-eco-does-not-do": [
+    "eco does not define workflow semantics.",
+    "eco does not define pipelines.",
+    "eco does not define graph execution.",
+    "eco does not schedule repeated runs.",
+    "eco does not interpret program outputs.",
+    "eco does not understand the domain meaning of an ecology.",
+    "eco does not mutate the source ecology during execution."
+  ],
+  "cli": {
+    "framework": "lionscliapp",
+    "application-name": "eco",
+    "project-directory": ".eco",
+    "commands": {
+      "run": {
+        "purpose": "Copy the configured ecology into a new run directory and execute it."
+      },
+      "set": {
+        "purpose": "Built-in lionscliapp command for persisting configuration values."
+      },
+      "get": {
+        "purpose": "Built-in lionscliapp command for inspecting a configuration value."
+      },
+      "keys": {
+        "purpose": "Built-in lionscliapp command for listing declared configuration keys."
+      },
+      "help": {
+        "purpose": "Built-in lionscliapp command for help text."
+      }
+    },
+    "configuration-keys": {
+      "execpath.ecology": {
+        "type": "path",
+        "purpose": "Path to the source ecology directory containing ecology.json.",
+        "notes": [
+          "The execpath. prefix is intentional.",
+          "lionscliapp expands and resolves this value before eco uses it.",
+          "Relative paths are resolved against the execution root."
+        ]
+      },
+      "execpath.rundir": {
+        "type": "path",
+        "purpose": "Path to the parent directory where eco creates run directories.",
+        "default": "runs",
+        "notes": [
+          "The directory is created if it does not exist.",
+          "Do not place execpath.rundir inside the source ecology."
+        ]
+      },
+      "json.indent.run": {
+        "type": "integer",
+        "purpose": "Indentation level for ECO-RUN.json.",
+        "default": 2
+      }
+    },
+    "common-invocations": [
+      {
+        "purpose": "Run an ecology with all paths provided for this invocation.",
+        "windows-powershell": "eco --execpath.ecology F:/mills/example/src --execpath.rundir F:/mill-runs run",
+        "linux-or-macos-shell": "eco --execpath.ecology ~/mills/example/src --execpath.rundir ~/mill-runs run"
+      },
+      {
+        "purpose": "Persist the usual run directory.",
+        "command": "eco set execpath.rundir F:/mill-runs"
+      },
+      {
+        "purpose": "Run with a persisted rundir.",
+        "command": "eco --execpath.ecology F:/mills/example/src run"
+      },
+      {
+        "purpose": "Inspect the configured run directory.",
+        "command": "eco get execpath.rundir"
+      }
+    ]
+  },
+  "ecology-json": {
+    "purpose": "Describe how eco should execute the copied ecology.",
+    "minimal-example": {
+      "eco-version": "1.0",
+      "execution": {
+        "entry-type": "subprocess",
+        "cwd": ".",
+        "command": [
+          "python",
+          "run.py"
+        ]
+      }
+    },
+    "with-environment-example": {
+      "eco-version": "1.0",
+      "identity": {
+        "name": "hello-ecology",
+        "type": "demo",
+        "description": "Tiny ecology used to demonstrate eco."
+      },
+      "execution": {
+        "entry-type": "subprocess",
+        "cwd": ".",
+        "command": [
+          "python",
+          "run.py"
+        ],
+        "environment": {
+          "MODE": "demo",
+          "OUTPUT_FORMAT": "json"
+        }
+      }
+    },
+    "fields": {
+      "eco-version": {
+        "required": true,
+        "type": "string",
+        "allowed-values": [
+          "1.0"
+        ],
+        "meaning": "Version of the ecology file format understood by eco."
+      },
+      "identity": {
+        "required": false,
+        "type": "object",
+        "meaning": "Optional human-readable description of the ecology.",
+        "keys": {
+          "name": "Short name for the ecology.",
+          "type": "Informal category or kind.",
+          "description": "Plain-language explanation of what this ecology is for."
+        }
+      },
+      "execution": {
+        "required": true,
+        "type": "object",
+        "meaning": "Execution instructions for eco."
+      },
+      "execution.entry-type": {
+        "required": true,
+        "type": "string",
+        "allowed-values": [
+          "subprocess"
+        ],
+        "meaning": "Execution mechanism. eco v1 supports subprocess only."
+      },
+      "execution.cwd": {
+        "required": true,
+        "type": "string",
+        "meaning": "Working directory relative to the copied run directory.",
+        "examples": [
+          ".",
+          "runtime",
+          "src"
+        ],
+        "rules": [
+          "Must be relative.",
+          "Must stay inside the copied run directory.",
+          "Must exist after the ecology has been copied."
+        ]
+      },
+      "execution.command": {
+        "required": true,
+        "type": "array of strings",
+        "meaning": "Command list passed directly to subprocess.run().",
+        "rules": [
+          "Use list form, not a single shell string.",
+          "Each argument is one list item.",
+          "Prefer commands that work from the declared cwd."
+        ],
+        "examples": [
+          [
+            "python",
+            "run.py"
+          ],
+          [
+            "python",
+            "-m",
+            "runtime.run"
+          ]
+        ]
+      },
+      "execution.environment": {
+        "required": false,
+        "type": "object mapping string to string",
+        "meaning": "Environment variables added to the subprocess environment.",
+        "rules": [
+          "Keys must be strings.",
+          "Values must be strings.",
+          "These values supplement the normal process environment."
+        ]
+      }
+    }
+  },
+  "authoring-an-ecology": {
+    "checklist": [
+      "Create a directory for the ecology.",
+      "Place the program, scripts, modules, data, assets, and support files inside it.",
+      "Make sure the program writes outputs relative to its working directory, not into hard-coded source paths.",
+      "Create ecology.json at the top of the ecology directory.",
+      "Set eco-version to 1.0.",
+      "Set execution.entry-type to subprocess.",
+      "Set execution.cwd to the directory where the command should run after copying.",
+      "Set execution.command as an array of strings.",
+      "Optionally set execution.environment for run-specific environment variables.",
+      "Run eco against the ecology and inspect the created run directory."
+    ],
+    "recommended-directory-shapes": [
+      {
+        "name": "simple-script",
+        "tree": [
+          "my-ecology/",
+          "  ecology.json",
+          "  run.py",
+          "  data.json"
+        ],
+        "command": [
+          "python",
+          "run.py"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "python-module",
+        "tree": [
+          "my-ecology/",
+          "  ecology.json",
+          "  runtime/",
+          "    __init__.py",
+          "    run.py",
+          "  assets/"
+        ],
+        "command": [
+          "python",
+          "-m",
+          "runtime.run"
+        ],
+        "cwd": "."
+      },
+      {
+        "name": "runtime-subdirectory",
+        "tree": [
+          "my-ecology/",
+          "  ecology.json",
+          "  runtime/",
+          "    run.py",
+          "    config.json"
+        ],
+        "command": [
+          "python",
+          "run.py"
+        ],
+        "cwd": "runtime"
+      }
+    ],
+    "good-practices": [
+      "Use relative file paths inside ecology programs whenever practical.",
+      "Write outputs into the current working directory or a relative output directory.",
+      "Do not assume the ecology will run from its original source location.",
+      "Avoid absolute paths inside ecology.json unless the command intentionally calls a system tool.",
+      "Keep ecology.json small and direct.",
+      "Put domain-specific meaning in the ecology's own files, not in eco."
+    ]
+  },
+  "running-an-ecology": {
+    "preflight": [
+      "Confirm the source ecology directory exists.",
+      "Confirm ecology.json exists at the ecology root.",
+      "Confirm execution.cwd exists relative to the ecology root.",
+      "Confirm the command can run on the target machine.",
+      "Confirm execpath.rundir is outside the ecology directory.",
+      "If using python, confirm required packages are installed in the environment that runs eco."
+    ],
+    "steps": [
+      "Run eco with execpath.ecology and execpath.rundir.",
+      "Observe the printed run id and run directory path.",
+      "Open the run directory.",
+      "Inspect copied files and generated outputs.",
+      "Inspect ECO-RUN.json for status and return code."
+    ],
+    "expected-success-signs": [
+      "A new yyyy-mm-dd_run-#### directory appears under execpath.rundir.",
+      "The directory contains a copy of the ecology.",
+      "ECO-RUN.json exists.",
+      "ECO-RUN.json status is COMPLETE.",
+      "The expected program outputs are inside the run directory, not the source ecology."
+    ],
+    "expected-failure-signs": [
+      "ECO-RUN.json status is FAILED.",
+      "return-code is non-zero.",
+      "An error field may appear when eco itself encountered an execution error.",
+      "The run directory still remains available for inspection."
+    ]
+  },
+  "operational-rules-for-llms": [
+    "When asked to make an ecology, create the ecology directory and ecology.json together.",
+    "When asked to run an ecology, prefer invoking eco rather than manually copying and running unless debugging eco itself.",
+    "Use execpath.ecology and execpath.rundir, not bare ecology or rundir.",
+    "Rely on lionscliapp path coercion for execpath.* values.",
+    "Never place the run directory inside the source ecology.",
+    "Do not make eco into a workflow engine when adding features.",
+    "Do not teach eco domain-specific meanings for ecology contents.",
+    "Keep validation at the boundary; after ecology.json is accepted, operational code may trust the normalized structure.",
+    "Prefer JSON files for configuration and metadata.",
+    "Prefer simple procedural Python over class-heavy architecture in eco itself."
+  ],
+  "common-mistakes": [
+    {
+      "mistake": "Writing execution.command as a single string.",
+      "bad": "python run.py",
+      "good": [
+        "python",
+        "run.py"
+      ],
+      "reason": "eco passes the command directly to subprocess.run(); list form is portable and unambiguous."
+    },
+    {
+      "mistake": "Using an absolute execution.cwd.",
+      "bad": "F:/mills/example/src",
+      "good": ".",
+      "reason": "execution.cwd must be relative to the copied run directory."
+    },
+    {
+      "mistake": "Writing outputs back into the source ecology.",
+      "reason": "eco's purpose is to preserve source ecologies as templates and put run outputs in run directories."
+    },
+    {
+      "mistake": "Putting execpath.rundir inside execpath.ecology.",
+      "reason": "The run directory would then be copied into future runs, causing recursive growth and confusing artifacts."
+    },
+    {
+      "mistake": "Assuming eco understands the ecology's domain.",
+      "reason": "eco only understands execution mechanics. Meaning belongs to the ecology or higher-level tools."
+    }
+  ],
+  "debugging": {
+    "if-eco-cannot-find-ecology-json": [
+      "Check that execpath.ecology points to the ecology root, not a parent directory.",
+      "Check the file is named exactly ecology.json.",
+      "Use eco get execpath.ecology to inspect the resolved path when persisted configuration is involved."
+    ],
+    "if-the-command-fails": [
+      "Open the run directory and inspect ECO-RUN.json.",
+      "Run the command manually from the run directory using the same cwd.",
+      "Check whether required Python packages are installed.",
+      "Check whether the command depends on files that were not included in the ecology.",
+      "Check whether the program used source-specific absolute paths."
+    ],
+    "if-outputs-appear-in-the-source-ecology": [
+      "Inspect the ecology program for absolute paths.",
+      "Change output paths to be relative to execution.cwd.",
+      "Rerun eco and confirm outputs appear in the run directory."
+    ],
+    "if-run-directories-grow-recursively": [
+      "Confirm execpath.rundir is outside execpath.ecology.",
+      "Move existing run directories out of the ecology source tree.",
+      "Rerun with a clean external rundir."
+    ]
+  },
+  "relationship-to-other-systems": {
+    "lionscliapp": [
+      "eco is implemented as a lionscliapp application.",
+      "lionscliapp provides command dispatch, persistent configuration, built-in set/get/help/keys commands, and execpath.* path coercion.",
+      "LLMs should preserve the execpath.* convention when modifying eco."
+    ],
+    "filetalk": [
+      "eco is compatible with filesystem-oriented systems such as FileTalk because runs leave structured files behind.",
+      "eco is not itself an IPC system."
+    ],
+    "battery-runner": [
+      "battery-runner can be placed inside an ecology or launched by an ecology command if desired.",
+      "eco should still only copy and execute; ongoing orchestration belongs to the program being run."
+    ],
+    "workflow-systems": [
+      "A workflow system may call eco to create isolated run artifacts.",
+      "The workflow system should own workflow semantics; eco should remain the crystallization runner."
+    ]
+  },
+  "future-extension-guidance": [
+    "Prefer adding small fields only when they support execution crystallization.",
+    "Do not add graph, pipeline, or scheduling semantics directly to eco v1.",
+    "If richer orchestration appears necessary, build it as a layer above eco.",
+    "Keep ECO-RUN.json human-readable and stable.",
+    "Preserve backward compatibility with ecology.json eco-version 1.0 unless deliberately creating a new version.",
+    "Document new ecology.json fields in docs/raw before depending on them in code."
+  ],
+  "minimal-test-ecology": {
+    "tree": [
+      "hello-ecology/",
+      "  ecology.json",
+      "  run.py"
+    ],
+    "ecology.json": {
+      "eco-version": "1.0",
+      "execution": {
+        "entry-type": "subprocess",
+        "cwd": ".",
+        "command": [
+          "python",
+          "run.py"
+        ]
+      }
+    },
+    "run.py": [
+      "from pathlib import Path",
+      "",
+      "Path('hello-output.txt').write_text('Hello from eco!\\n', encoding='utf-8')",
+      "print('wrote hello-output.txt')"
+    ],
+    "run-command": "eco --execpath.ecology ./hello-ecology --execpath.rundir ./runs run",
+    "success-condition": "A new run directory contains ecology.json, run.py, hello-output.txt, and ECO-RUN.json with status COMPLETE."
+  }
+}
