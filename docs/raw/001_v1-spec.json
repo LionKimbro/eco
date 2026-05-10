@@ -50,13 +50,20 @@
   "command-line-interface": {
     "description": "The eco command-line interface.",
     "examples": [
-      "eco --ecology F:/mills/fantasy-scene/src --rundir F:/mill-runs run",
-      "eco set rundir F:/mill-runs",
-      "eco --ecology F:/mills/fantasy-scene/src run"
+      "eco --execpath.ecology F:/mills/fantasy-scene/src --execpath.rundir F:/mill-runs run",
+      "eco set execpath.rundir F:/mill-runs",
+      "eco --execpath.ecology F:/mills/fantasy-scene/src run",
+      "eco --execpath.ecology F:/mills/fantasy-scene/src --execpath.rundir F:/mill-runs --times 5 run"
     ]
   },
   "persistent-configuration": {
-    "description": "Persistent configuration handled through lionscliapp."
+    "description": "Persistent configuration handled through lionscliapp.",
+    "keys": {
+      "execpath.ecology": "Source ecology directory containing ecology.json.",
+      "execpath.rundir": "Parent directory where timestamped run directories are created.",
+      "times": "Number of runs to perform in series; defaults to 1 and must be a positive integer.",
+      "json.indent.run": "Indentation level for ECO-RUN.json."
+    }
   },
   "ecology-directory": {
     "description": "A source directory tree that eco can crystallize into a runnable execution directory.",
@@ -169,7 +176,8 @@
       "Deep-copy the entire source ecology directory into the allocated run directory.",
       "Write ECO-RUN.json with status RUNNING.",
       "Execute the declared command using subprocess.run().",
-      "Rewrite ECO-RUN.json with final status COMPLETE or FAILED."
+      "Rewrite ECO-RUN.json with final status COMPLETE or FAILED.",
+      "If times is greater than 1, repeat the lifecycle in series until the requested count is complete or a run fails."
     ]
   },
   "eco-run-json": {

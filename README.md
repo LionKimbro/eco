@@ -45,6 +45,15 @@ On Linux or macOS, the same command shape applies:
 eco --execpath.ecology ~/mills/fantasy-scene/src --execpath.rundir ~/mill-runs run
 ```
 
+To run the same ecology several times in series:
+
+```powershell
+eco --execpath.ecology F:/mills/fantasy-scene/src --execpath.rundir F:/mill-runs --times 5 run
+```
+
+Each run gets its own run directory. If one run fails, `eco` stops the series
+and does not start the remaining runs.
+
 The two important settings are:
 
 `execpath.ecology`
@@ -52,6 +61,9 @@ The two important settings are:
 
 `execpath.rundir`
 : The parent directory where `eco` creates timestamped run directories.
+
+`times`
+: The number of runs to perform in series. The default is `1`.
 
 These names come from `lionscliapp`. The `execpath.` prefix means the value is
 automatically interpreted as a filesystem path, expanded, and resolved before
@@ -65,6 +77,12 @@ For example, you can save your usual run directory:
 
 ```powershell
 eco set execpath.rundir F:/mill-runs
+```
+
+You can also save a usual repeat count:
+
+```powershell
+eco set times 3
 ```
 
 Then future commands can omit it:
@@ -286,6 +304,9 @@ It only does this:
 3. Copy the ecology into it.
 4. Run the declared command there.
 5. Record the result.
+
+When `times` is greater than `1`, `eco` repeats those steps in series. It stops
+early if a run fails.
 
 That narrowness is part of the design. Other systems can build richer behavior
 on top of `eco`, while `eco` remains easy to understand and inspect.

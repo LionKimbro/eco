@@ -87,13 +87,14 @@
     "Deep-copies the entire ecology directory into the run directory.",
     "Writes ECO-RUN.json with status RUNNING.",
     "Runs the declared subprocess from inside the copied directory.",
-    "Rewrites ECO-RUN.json with status COMPLETE or FAILED."
+    "Rewrites ECO-RUN.json with status COMPLETE or FAILED.",
+    "When times is greater than 1, repeats the copy-run-record cycle in series and stops at the first failure."
   ],
   "what-eco-does-not-do": [
     "eco does not define workflow semantics.",
     "eco does not define pipelines.",
     "eco does not define graph execution.",
-    "eco does not schedule repeated runs.",
+    "eco does not schedule delayed or background runs.",
     "eco does not interpret program outputs.",
     "eco does not understand the domain meaning of an ecology.",
     "eco does not mutate the source ecology during execution."
@@ -138,6 +139,17 @@
           "Do not place execpath.rundir inside the source ecology."
         ]
       },
+      "times": {
+        "type": "integer-like string",
+        "purpose": "Number of runs to perform in series.",
+        "default": "1",
+        "rules": [
+          "Must parse as an integer.",
+          "Must be at least 1.",
+          "Each run receives its own run directory.",
+          "If a run fails, eco stops the series and does not start the remaining runs."
+        ]
+      },
       "json.indent.run": {
         "type": "integer",
         "purpose": "Indentation level for ECO-RUN.json.",
@@ -151,8 +163,17 @@
         "linux-or-macos-shell": "eco --execpath.ecology ~/mills/example/src --execpath.rundir ~/mill-runs run"
       },
       {
+        "purpose": "Run the same ecology several times in series.",
+        "windows-powershell": "eco --execpath.ecology F:/mills/example/src --execpath.rundir F:/mill-runs --times 5 run",
+        "linux-or-macos-shell": "eco --execpath.ecology ~/mills/example/src --execpath.rundir ~/mill-runs --times 5 run"
+      },
+      {
         "purpose": "Persist the usual run directory.",
         "command": "eco set execpath.rundir F:/mill-runs"
+      },
+      {
+        "purpose": "Persist the usual repeat count.",
+        "command": "eco set times 3"
       },
       {
         "purpose": "Run with a persisted rundir.",
@@ -354,33 +375,37 @@
       "Confirm execution.cwd exists relative to the ecology root.",
       "Confirm the command can run on the target machine.",
       "Confirm execpath.rundir is outside the ecology directory.",
+      "If using times, confirm it is a positive integer.",
       "If using python, confirm required packages are installed in the environment that runs eco."
     ],
     "steps": [
       "Run eco with execpath.ecology and execpath.rundir.",
-      "Observe the printed run id and run directory path.",
-      "Open the run directory.",
+      "Optionally include --times N to perform N runs in series.",
+      "Observe the printed run id and run directory path for each started run.",
+      "Open the run directory or directories.",
       "Inspect copied files and generated outputs.",
       "Inspect ECO-RUN.json for status and return code."
     ],
     "expected-success-signs": [
-      "A new yyyy-mm-dd_run-#### directory appears under execpath.rundir.",
-      "The directory contains a copy of the ecology.",
-      "ECO-RUN.json exists.",
-      "ECO-RUN.json status is COMPLETE.",
-      "The expected program outputs are inside the run directory, not the source ecology."
+      "One new yyyy-mm-dd_run-#### directory appears under execpath.rundir for each completed run.",
+      "Each directory contains a copy of the ecology.",
+      "Each run directory contains ECO-RUN.json.",
+      "Each ECO-RUN.json status is COMPLETE.",
+      "The expected program outputs are inside the run directories, not the source ecology."
     ],
     "expected-failure-signs": [
       "ECO-RUN.json status is FAILED.",
       "return-code is non-zero.",
       "An error field may appear when eco itself encountered an execution error.",
-      "The run directory still remains available for inspection."
+      "The failed run directory still remains available for inspection.",
+      "If times was greater than 1, no later runs are started after the failure."
     ]
   },
   "operational-rules-for-llms": [
     "When asked to make an ecology, create the ecology directory and ecology.json together.",
     "When asked to run an ecology, prefer invoking eco rather than manually copying and running unless debugging eco itself.",
     "Use execpath.ecology and execpath.rundir, not bare ecology or rundir.",
+    "Use times for serial repetition; do not invent a separate repeat field.",
     "Rely on lionscliapp path coercion for execpath.* values.",
     "Never place the run directory inside the source ecology.",
     "Do not make eco into a workflow engine when adding features.",
@@ -412,6 +437,10 @@
     {
       "mistake": "Putting execpath.rundir inside execpath.ecology.",
       "reason": "The run directory would then be copied into future runs, causing recursive growth and confusing artifacts."
+    },
+    {
+      "mistake": "Setting times to zero, a negative number, or a non-integer string.",
+      "reason": "times must be a positive integer because eco performs a concrete sequence of one or more runs."
     },
     {
       "mistake": "Assuming eco understands the ecology's domain.",

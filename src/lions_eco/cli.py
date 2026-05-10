@@ -31,10 +31,12 @@ def declare_app():
 
     app.declare_key("execpath.ecology", "")
     app.declare_key("execpath.rundir", "runs")
+    app.declare_key("times", "1")
     app.declare_key("json.indent.run", 2)
 
     app.describe_key("execpath.ecology", "Source ecology directory containing ecology.json")
     app.describe_key("execpath.rundir", "Directory where timestamped run directories are created")
+    app.describe_key("times", "Number of runs to perform in series")
     app.describe_key("json.indent.run", "Indent level for ECO-RUN.json")
 
     app.declare_cmd("run", cmd_run)
@@ -47,18 +49,29 @@ def cmd_run():
     validate_ecology(ecology)
     validate_run_relationship(runtime["ecology"], runtime["rundir"])
 
-    run = prepare_run(runtime, ecology)
-    print(f"eco run: {run['run-id']}")
-    print(f"run directory: {run['run-path']}")
+    for index in range(runtime["times"]):
+        if runtime["times"] > 1:
+            print(f"eco series: {index + 1} of {runtime['times']}")
 
+        run = prepare_run(runtime, ecology)
+        print(f"eco run: {run['run-id']}")
+        print(f"run directory: {run['run-path']}")
+
+        if not perform_run(run, ecology):
+            return
+
+
+def perform_run(run, ecology):
     try:
         result = execute_run(run, ecology)
         if result.returncode == 0:
             finish_run(run, "COMPLETE", result.returncode)
             print("eco status: COMPLETE")
+            return True
         else:
             finish_run(run, "FAILED", result.returncode)
             print(f"eco status: FAILED ({result.returncode})")
+            return False
     except Exception as exc:
         finish_run(run, "FAILED", None, str(exc))
         raise
@@ -74,7 +87,19 @@ def read_runtime_config():
     return {
         "ecology": ecology,
         "rundir": rundir,
+        "times": read_times(),
     }
+
+
+def read_times():
+    text = str(app.ctx["times"]).strip()
+    try:
+        times = int(text)
+    except ValueError as exc:
+        raise ValueError("times must be an integer") from exc
+    if times < 1:
+        raise ValueError("times must be at least 1")
+    return times
 
 
 def read_ecology(ecology_path):

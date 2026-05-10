@@ -1,5 +1,6 @@
 import json
 import sys
+from types import SimpleNamespace
 
 import lions_eco.cli as eco
 
@@ -74,3 +75,62 @@ def test_validate_rejects_rundir_inside_ecology(tmp_path):
         assert "rundir must not be inside" in str(exc)
     else:
         raise AssertionError("expected validation failure")
+
+
+def test_read_times_requires_positive_integer(monkeypatch):
+    monkeypatch.setitem(eco.app.ctx, "times", "3")
+    assert eco.read_times() == 3
+
+    monkeypatch.setitem(eco.app.ctx, "times", "0")
+    try:
+        eco.read_times()
+    except ValueError as exc:
+        assert "at least 1" in str(exc)
+    else:
+        raise AssertionError("expected validation failure")
+
+
+def test_cmd_run_performs_multiple_runs_in_series(tmp_path, monkeypatch):
+    monkeypatch.setitem(eco.app.ctx, "execpath.ecology", tmp_path / "source")
+    monkeypatch.setitem(eco.app.ctx, "execpath.rundir", tmp_path / "runs")
+    monkeypatch.setitem(eco.app.ctx, "times", "3")
+    monkeypatch.setitem(eco.app.ctx, "json.indent.run", 2)
+    write_ecology(tmp_path / "source", [sys.executable, "-c", "print('hello')"])
+
+    monkeypatch.setattr(eco, "execute_run", lambda run, ecology: SimpleNamespace(returncode=0))
+
+    eco.cmd_run()
+
+    run_dirs = sorted((tmp_path / "runs").iterdir())
+    assert len(run_dirs) == 3
+    assert run_dirs[0].name.endswith("_run-0000")
+    assert run_dirs[1].name.endswith("_run-0001")
+    assert run_dirs[2].name.endswith("_run-0002")
+    for run_dir in run_dirs:
+        metadata = json.loads((run_dir / "ECO-RUN.json").read_text(encoding="utf-8"))
+        assert metadata["status"] == "COMPLETE"
+
+
+def test_cmd_run_stops_series_after_failure(tmp_path, monkeypatch):
+    monkeypatch.setitem(eco.app.ctx, "execpath.ecology", tmp_path / "source")
+    monkeypatch.setitem(eco.app.ctx, "execpath.rundir", tmp_path / "runs")
+    monkeypatch.setitem(eco.app.ctx, "times", "3")
+    monkeypatch.setitem(eco.app.ctx, "json.indent.run", 2)
+    write_ecology(tmp_path / "source", [sys.executable, "-c", "print('hello')"])
+
+    results = [0, 7, 0]
+
+    def fake_execute_run(run, ecology):
+        return SimpleNamespace(returncode=results.pop(0))
+
+    monkeypatch.setattr(eco, "execute_run", fake_execute_run)
+
+    eco.cmd_run()
+
+    run_dirs = sorted((tmp_path / "runs").iterdir())
+    assert len(run_dirs) == 2
+    first = json.loads((run_dirs[0] / "ECO-RUN.json").read_text(encoding="utf-8"))
+    second = json.loads((run_dirs[1] / "ECO-RUN.json").read_text(encoding="utf-8"))
+    assert first["status"] == "COMPLETE"
+    assert second["status"] == "FAILED"
+    assert second["return-code"] == 7
